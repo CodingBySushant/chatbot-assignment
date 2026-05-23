@@ -1,0 +1,28 @@
+# Secrets — never in image
+.env
+
+# Local vector DB — using Qdrant Cloud in production
+data/qdrant_db/
+qdrant_db/
+
+# PDFs — not needed at runtime (vectors already in Qdrant Cloud)
+data/pdfs/
+
+# Python artifacts
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Dev / local only
+scripts/
+logs/
+.git/
+.gitignore
+*.md
+
+# OS
+.DS_Store
+Thumbs.db
