@@ -14,29 +14,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from api.routes import router  # moved to top to fix E402
+
 load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-    ],
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger("main")
 
 # Add file handler only if logs dir is writable (not always true on Cloud Run)
 try:
     Path("logs").mkdir(exist_ok=True)
-    file_handler = logging.FileHandler("logs/server.log")
-    logging.getLogger().addHandler(file_handler)
+    logging.getLogger().addHandler(logging.FileHandler("logs/server.log"))
 except Exception:
     pass
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-warm models on startup so first query is fast
     logger.info("Pre-loading embedding model and reranker...")
     try:
         from ingestion.embedder import get_embedder
@@ -62,11 +60,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from api.routes import router
 app.include_router(router, prefix="/api")
 
-# Serve static HTML UI
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/")
 async def serve_ui():

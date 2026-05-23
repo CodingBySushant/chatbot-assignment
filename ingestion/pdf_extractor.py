@@ -15,7 +15,7 @@ from pdf2image import convert_from_path
 
 logger = logging.getLogger(__name__)
 
-NATIVE_TEXT_THRESHOLD = 50   # chars — below this we treat page as scanned
+NATIVE_TEXT_THRESHOLD = 50
 
 
 @dataclass
@@ -35,8 +35,8 @@ def _clean_text(raw: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", raw)
     text = re.sub(r"(?m)^\s*[-–]?\s*\d{1,4}\s*[-–]?\s*$", "", text)
     text = re.sub(r" {2,}", " ", text)
-    lines = [l.strip() for l in text.splitlines()]
-    lines = [l for l in lines if not re.match(r"^[=\-_*#~]{4,}$", l)]
+    lines = [line.strip() for line in text.splitlines()]           # fixed E741
+    lines = [line for line in lines if not re.match(r"^[=\-_*#~]{4,}$", line)]  # fixed E741
     return "\n".join(lines).strip()
 
 
@@ -64,7 +64,7 @@ def extract_pdf(pdf_path: str) -> Generator[PageContent, None, None]:
         logger.error(f"Cannot open {pdf_path}: {e}")
         return
 
-    logger.info(f"Extracting {filename} ({len(doc)} pages)…")
+    logger.info(f"Extracting {filename} ({len(doc)} pages)...")
 
     for i in range(len(doc)):
         page = doc[i]
