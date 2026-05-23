@@ -7,6 +7,8 @@ Cloud mode  : set QDRANT_URL and QDRANT_API_KEY in .env
 
 import logging
 import os
+import time
+
 from typing import List, Dict, Any, Set
 
 import numpy as np
@@ -36,19 +38,19 @@ class VectorStore:
     ):
         self.collection_name = collection_name
 
-        qdrant_url     = os.getenv("QDRANT_URL", "").strip()
+        qdrant_url = os.getenv("QDRANT_URL", "").strip()
         qdrant_api_key = os.getenv("QDRANT_API_KEY", "").strip()
 
         if qdrant_url:
-            # Cloud mode — increased timeout for slow connections
+            # Cloud mode
             logger.info(f"Connecting to Qdrant Cloud: {qdrant_url}")
             self.client = QdrantClient(
                 url=qdrant_url,
                 api_key=qdrant_api_key,
-                timeout=60,   # ← add this line (default is 5 seconds — too short)
+                timeout=60,
             )
         else:
-            # ── Local mode (fallback for dev) ────────────────────────────────
+            # Local mode (fallback for dev)
             local_path = path or os.getenv("QDRANT_PATH", "./data/qdrant_db")
             logger.info(f"Using local Qdrant at: {local_path}")
             self.client = QdrantClient(path=local_path)
@@ -95,8 +97,8 @@ class VectorStore:
                 )
             )
 
-        # ── CHANGED: smaller batch + timeout ────────────────────────────────
-        batch_size = 50   # reduced from 256
+        # Small batches + retry for Qdrant Cloud free tier
+        batch_size = 50
         for i in range(0, len(points), batch_size):
             batch = points[i : i + batch_size]
             retries = 3
@@ -107,14 +109,20 @@ class VectorStore:
                         points=batch,
                         wait=True,
                     )
-                    break  # success — move to next batch
+                    break
                 except Exception as e:
                     if attempt < retries - 1:
-                        logger.warning(f"Batch {i//batch_size + 1} failed (attempt {attempt+1}), retrying... {e}")
-                        import time; time.sleep(3)
+                        logger.warning(
+                            f"Batch {i//batch_size + 1} failed "
+                            f"(attempt {attempt+1}), retrying... {e}"
+                        )
+                        time.sleep(3)  # fixed E702 — separate line
                     else:
                         raise
-            logger.debug(f"Upserted batch {i//batch_size + 1}/{(len(points)-1)//batch_size + 1}")
+            logger.debug(
+                f"Upserted batch {i//batch_size + 1}/"
+                f"{(len(points)-1)//batch_size + 1}"
+            )
 
         logger.info(f"Upserted {len(points)} chunks to Qdrant.")
 
@@ -144,13 +152,10 @@ class VectorStore:
         return self.count() > 0
 
     def get_ingested_files(self) -> Set[str]:
-        """
-        Return set of filenames already ingested.
-        Scrolls through all Qdrant points to collect unique filenames.
-        """
+        """Return set of filenames already ingested into the collection."""
         ingested = set()
-        limit    = 100
-        offset   = None
+        limit = 100
+        offset = None
 
         while True:
             results, next_offset = self.client.scroll(
@@ -170,10 +175,7 @@ class VectorStore:
         return ingested
 
     def delete_file(self, filename: str):
-        """
-        Delete all vectors for a specific PDF filename.
-        Used before re-ingesting to avoid duplicates.
-        """
+        """Delete all vectors for a specific PDF filename."""
         self.client.delete(
             collection_name=self.collection_name,
             points_selector=Filter(
